@@ -65,11 +65,11 @@ string colorID(Mat& inputImage) {
 string colorID(Mat img) {
     const int MAX_CLUSTERS = 5;
     Scalar colorTab[] = {
-        Scalar(0, 0, 255),
-        Scalar(0, 255, 0),
-        Scalar(255, 100, 100),
-        Scalar(255, 0, 255),
-        Scalar(0, 255, 255)
+        Scalar(0, 0, 255),          //Red #FF0000
+        Scalar(0, 255, 0),          //Green #00FF00
+        Scalar(255, 100, 100),      //Lime #64FF00
+        Scalar(255, 0, 255),        //Pink? #FF00FF I have a history of color blindness. Please don't hurt me.
+        Scalar(0, 255, 255)         //Yellow #FFFF00
     };
 
     RNG rng(12345);
