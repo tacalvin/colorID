@@ -1,9 +1,11 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <opencv2/ml.hpp>
 #include <string>
 #include <assert.h>
 
 using namespace std;
+using namespace cv::ml;
 using namespace cv;
 
 /*
@@ -71,10 +73,10 @@ string colorID(Mat src) {
        samples.at<float>(y + x*src.rows, z) = src.at<Vec3b>(y,x)[z];
 
 
- int clusterCount = 15;
+ int clusterCount = 8;
  Mat labels;
  int attempts = 5;
- Mat centers;
+ Mat centers;//holds colors for each cluster
  kmeans(samples, clusterCount, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
 
 
@@ -84,14 +86,106 @@ string colorID(Mat src) {
  for( int y = 0; y < src.rows; y++ )
    for( int x = 0; x < src.cols; x++ )
    {
-     int cluster_idx = labels.at<int>(y + x*src.rows,0);
+     int cluster_idx = labels.at<int>(y + x*src.rows,0); // labels are stored in a 1d array and represents a 2d array
+    //  cout << "y:" << y << " x: " << x << " x* scr.rows" << x*src.rows << endl;
      new_image.at<Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
      new_image.at<Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
      new_image.at<Vec3b>(y,x)[2] = centers.at<float>(cluster_idx, 2);
    }
 
  imshow( "clustered image", new_image );
- imshow("orignal",src );
+ // imshow("orignal",centers );
+ // cout << "centers" << centers << endl;
+
+
+ Mat matTrainFeatures(2,src.rows * src.cols,CV_32F);
+ // x,y 2 coordinates and src.rows * scr.cols number of pixels
+ // Mat matSample(0,number_of_sample_elements,CV_32F);
+
+ Mat matTrainLabels(1,labels.rows,CV_32S);
+ // Mat matSampleLabels(0,number_of_sample_elements,CV_32F);
+
+ Mat matResults;
+
+ //etcetera code for loading data into Mat variables suppressed
+ for(int y = 0; y < new_image.rows * new_image.cols;y++)
+ {
+  matTrainFeatures.at<float>(1,y)= y%new_image.rows;
+  // cout << "y:"<<y << endl;
+ }
+
+ for(int x = 0; x <  new_image.rows * new_image.cols;x++)
+ {
+  //  cout << "x: " << x << endl;
+  matTrainFeatures.at<float>(0,x)= x%new_image.cols;
+ }
+ // cout << "trainlabel rows" << matTrainLabels.rows << "cols" << matTrainLabels.cols << endl;
+ // cout << "label rows" << labels.rows << "cols" << labels.cols << endl;
+ // cout << matTrainLabels <<endl;
+ for(int i =0; i < labels.rows; i++)
+ {
+  //  cout <<"i" <<i <<endl;
+  // cout <<"labels[0] = "<<labels.at<int>(i,0) << endl;
+   matTrainLabels.at<int>(0,i) =labels.at<int>(0,i);
+ }
+cout << "here" << endl;
+// cout << matTrainFeatures << endl;
+ Ptr<TrainData> trainingData;
+ Ptr<KNearest> kclassifier=KNearest::create();
+
+ trainingData=TrainData::create(matTrainFeatures,
+                         SampleTypes::COL_SAMPLE,matTrainLabels);
+cout << "here1" << endl;
+
+
+ kclassifier->setIsClassifier(true);
+ kclassifier->setAlgorithmType(KNearest::Types::BRUTE_FORCE);
+ kclassifier->setDefaultK(9);
+ Mat matSample(2,2,CV_32F);
+ matSample.at<float>(0,0) = 1;
+ matSample.at<float>(0,1) = 1;
+ matSample.at<float>(1,0) = src.rows/2;
+ matSample.at<float>(1,1) = src.cols/2;
+ // cout << "Responses" << endl;
+ // cout << trainingData->getTrainResponses() << endl;
+ // cout << trainingData << endl
+ kclassifier->train(trainingData);
+ kclassifier->findNearest(matSample,kclassifier->getDefaultK(),matResults);
+ // cout <<centers.at<float>(matResults.at<int>(0),0)<<endl;
+ // cout <<centers.at<float>(matResults.at<int>(0),1)<<endl;
+ // cout <<centers.at<float>(matResults.at<int>(0),2)<<endl;
+ //
+ // cout <<centers.at<float>(matResults.at<int>(1),0)<<endl;
+ // cout <<centers.at<float>(matResults.at<int>(1),1)<<endl;
+ // cout <<centers.at<float>(matResults.at<int>(1),2)<<endl;
+ //Just checking the settings
+// cout<<"Training data: "<<endl
+//     <<"getNSamples\t"<<trainingData->getNSamples()<<endl
+//     <<"getSamples\n"<<trainingData->getSamples()<<endl
+//     <<endl;
+//
+// cout<<"Classifier :"<<endl
+//     <<"kclassifier->getDefaultK(): "<<kclassifier->getDefaultK()<<endl
+//     <<"kclassifier->getIsClassifier()   : "<<kclassifier->getIsClassifier()<<endl
+//     <<"kclassifier->getAlgorithmType(): "<<kclassifier->getAlgorithmType()<<endl
+//     <<endl;
+//
+// //confirming sample order
+// cout<<"matSample: "<<endl
+//     <<matSample<<endl
+//     <<endl;
+
+//displaying the results
+cout<<"matResults: "<<endl
+    <<matResults<<endl
+    <<endl;
+ // cout << (int)(src.at<Vec3b>(1,1)[0]) << endl;
+ // cout << (int)(src.at<Vec3b>(1,1)[1]) << endl;
+ // cout << (int)(src.at<Vec3b>(1,1)[2]) << endl;
+ // cout << (int)(src.at<Vec3b>(src.rows/2,src.cols/2)[0]) << endl;
+ // cout << (int)(src.at<Vec3b>(src.rows/2,src.cols/2)[1]) << endl;
+ // cout << (int)(src.at<Vec3b>(src.rows/2,src.cols/2)[2]) << endl;
+
  // Mat dst;
  // addWeighted( src, .5, new_image, .5, 0.0, dst);
  // imshow("overlay",dst);
@@ -140,10 +234,7 @@ string colorID(Mat src) {
   //       }
   //
   //       randShuffle(points, 1, &rng);
-  //
-  //       kmeans(points, clusterCount, labels,
-  //           TermCriteria( TermCriteria::EPS+TermCriteria::COUNT, 10, 1.0),
-  //               3, KMEANS_PP_CENTERS, centers);
+
   //
   //       img = Scalar::all(0);
   //       for( i=0; i<sampleCount; i++ ) {
@@ -158,7 +249,7 @@ string colorID(Mat src) {
   //       // if( key == 27 || key == 'q' || key == 'Q' ) // ESC
   //       //     break;
 
-
+return " ";
 }
 
 
